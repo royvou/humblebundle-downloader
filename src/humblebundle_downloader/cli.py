@@ -185,15 +185,18 @@ def sync(
             if not resolved_order_keys:
                 raise HumbleApiError("No order keys were discovered for this account.")
             with StateStore(settings.db_path) as store:
-                inserted, updated, errors = await sync_orders(
+                inserted, updated, migrated, skipped, errors = await sync_orders(
                     client=client,
                     store=store,
                     order_keys=resolved_order_keys,
+                    output_dir=settings.output_dir,
                 )
-                return resolved_order_keys, inserted, updated, errors
+                return resolved_order_keys, inserted, updated, migrated, skipped, errors
 
     try:
-        synced_order_keys, inserted, updated, errors = _run_async(run)
+        synced_order_keys, inserted, updated, migrated, skipped, errors = _run_async(
+            run
+        )
     except HumbleApiError as exc:
         raise typer.Exit(code=_fail(str(exc))) from exc
 
@@ -201,6 +204,17 @@ def sync(
     console.print(
         f"Inserted {inserted} file record(s); updated {updated} existing record(s)."
     )
+    if migrated:
+        console.print(
+            f"Migrated {migrated} existing file(s) to renamed bundle folders."
+        )
+    if skipped:
+        console.print(
+            "[yellow]"
+            f"Skipped {skipped} path migration(s) because the destination "
+            "already exists."
+            "[/yellow]"
+        )
     if not order_keys:
         console.print(
             f"Discovered {len(synced_order_keys)} order key(s) from the Humble account."

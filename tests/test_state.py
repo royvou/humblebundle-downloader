@@ -22,16 +22,22 @@ def test_upsert_preserves_complete_status_for_unchanged_file(tmp_path: Path) -> 
         relative_path="Bundle/Item/file.pdf",
     )
 
-    inserted, updated = store.upsert_order_files("KEY123", "Bundle", [remote_file])
+    inserted, updated, migrations = store.upsert_order_files(
+        "KEY123", "Bundle", [remote_file]
+    )
     assert inserted == 1
     assert updated == 0
+    assert migrations == []
 
     stored_file = store.list_files()[0]
     store.mark_complete(stored_file.id)
 
-    inserted, updated = store.upsert_order_files("KEY123", "Bundle", [remote_file])
+    inserted, updated, migrations = store.upsert_order_files(
+        "KEY123", "Bundle", [remote_file]
+    )
     assert inserted == 0
     assert updated == 1
+    assert migrations == []
     assert store.list_files()[0].status == "complete"
 
     store.close()

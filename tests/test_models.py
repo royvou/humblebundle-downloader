@@ -33,6 +33,7 @@ https://www.humblebundle.com/downloads?key=XYZ789
 
 def test_parse_order_payload_extracts_files_and_dedupes_paths() -> None:
     payload = {
+        "orderdate": "2024-07-15T00:00:00Z",
         "product": {"human_name": "Bundle: Name"},
         "subproducts": [
             {
@@ -65,10 +66,22 @@ def test_parse_order_payload_extracts_files_and_dedupes_paths() -> None:
 
     bundle_name, files = parse_order_payload("KEY123", payload)
 
-    assert bundle_name == "Bundle_ Name"
+    assert bundle_name == "Bundle_ Name (2024)"
     assert len(files) == 2
     assert files[0].relative_path != files[1].relative_path
     assert files[0].md5 == "abcdef"
+
+
+def test_parse_order_payload_falls_back_when_no_year_exists() -> None:
+    payload = {
+        "product": {"human_name": "Bundle Name"},
+        "subproducts": [],
+    }
+
+    bundle_name, files = parse_order_payload("KEY123", payload)
+
+    assert bundle_name == "Bundle Name"
+    assert files == []
 
 
 def test_sanitize_component_trims_windows_unsafe_characters() -> None:

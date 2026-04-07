@@ -21,7 +21,7 @@ def test_sync_requires_keys(tmp_path: Path, monkeypatch) -> None:
         ),
         patch(
             "humblebundle_downloader.cli.sync_orders",
-            new=AsyncMock(return_value=(0, 0, {})),
+            new=AsyncMock(return_value=(0, 0, 0, 0, {})),
         ),
     ):
         result = runner.invoke(app, ["sync"])
@@ -115,7 +115,7 @@ def test_sync_accepts_positional_keys_file(tmp_path: Path, monkeypatch) -> None:
         patch("humblebundle_downloader.cli.HumbleApiClient.test_auth", new=AsyncMock()),
         patch(
             "humblebundle_downloader.cli.sync_orders",
-            new=AsyncMock(return_value=(0, 0, {})),
+            new=AsyncMock(return_value=(0, 0, 0, 0, {})),
         ),
     ):
         result = runner.invoke(app, ["sync", str(keys_file)])
@@ -139,7 +139,7 @@ def test_sync_uses_account_discovery_when_keys_are_omitted(
         ),
         patch(
             "humblebundle_downloader.cli.sync_orders",
-            new=AsyncMock(return_value=(4, 0, {})),
+            new=AsyncMock(return_value=(4, 0, 0, 0, {})),
         ),
     ):
         result = runner.invoke(app, ["sync"])

@@ -29,6 +29,14 @@ class StoredFile:
     last_error: str | None
 
 
+@dataclass(frozen=True, slots=True)
+class PathMigration:
+    file_id: int
+    old_relative_path: str
+    new_relative_path: str
+    restore_complete: bool
+
+
 class StateStore:
     def __init__(self, db_path: Path) -> None:
         db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -82,7 +90,7 @@ class StateStore:
 
     def upsert_order_files(
         self, order_key: str, bundle_name: str, files: list[RemoteFile]
-    ) -> tuple[int, int]:
+    ) -> tuple[int, int, list[PathMigration]]:
         synced_at = _utc_now()
         cursor = self._connection.cursor()
         cursor.execute(
@@ -98,6 +106,7 @@ class StateStore:
 
         inserted = 0
         updated = 0
+        migrations: list[PathMigration] = []
         active_source_ids = {remote_file.source_id for remote_file in files}
         for remote_file in files:
             row = cursor.execute(
@@ -139,6 +148,7 @@ class StateStore:
                 or row["relative_path"] != remote_file.relative_path
                 or row["filename"] != remote_file.filename
             )
+            path_changed = row["relative_path"] != remote_file.relative_path
             next_status = "pending" if metadata_changed else row["status"]
             next_completed_at = (
                 None
@@ -184,6 +194,18 @@ class StateStore:
                     row["id"],
                 ),
             )
+            if path_changed:
+                migrations.append(
+                    PathMigration(
+                        file_id=int(row["id"]),
+                        old_relative_path=str(row["relative_path"]),
+                        new_relative_path=remote_file.relative_path,
+                        restore_complete=(
+                            row["md5"] == remote_file.md5
+                            and row["status"] == "complete"
+                        ),
+                    )
+                )
             updated += 1
 
         placeholders = ", ".join("?" for _ in active_source_ids)
@@ -199,7 +221,7 @@ class StateStore:
             cursor.execute("DELETE FROM files WHERE order_key = ?", (order_key,))
 
         self._connection.commit()
-        return inserted, updated
+        return inserted, updated, migrations
 
     def reset_incomplete_downloads(self) -> int:
         cursor = self._connection.execute(

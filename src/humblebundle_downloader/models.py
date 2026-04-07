@@ -6,6 +6,7 @@ from pathlib import PurePosixPath
 from urllib.parse import parse_qs, urlparse
 
 _INVALID_PATH_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+_YEAR_PATTERN = re.compile(r"\b(19\d{2}|20\d{2}|21\d{2})\b")
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,6 +88,29 @@ def _ensure_list(value: object) -> list[object]:
     return [value]
 
 
+def _bundle_year(payload: dict[str, object], product: object) -> str | None:
+    candidates: list[object] = [
+        payload.get("orderdate"),
+        payload.get("created"),
+        payload.get("created_at"),
+    ]
+    if isinstance(product, dict):
+        candidates.extend(
+            [
+                product.get("created"),
+                product.get("created_at"),
+            ]
+        )
+
+    for candidate in candidates:
+        if not candidate:
+            continue
+        match = _YEAR_PATTERN.search(str(candidate))
+        if match:
+            return match.group(1)
+    return None
+
+
 def _source_id(
     order_key: str, item_machine_name: str, platform: str, label: str, filename: str
 ) -> str:
@@ -162,8 +186,12 @@ def parse_order_payload(
     order_key: str, payload: dict[str, object]
 ) -> tuple[str, list[RemoteFile]]:
     product = payload.get("product") or {}
+    raw_bundle_name = str(
+        getattr(product, "get", lambda *_: "")("human_name", "") or order_key
+    )
+    bundle_year = _bundle_year(payload, product)
     bundle_name = sanitize_component(
-        str(getattr(product, "get", lambda *_: "")("human_name", "") or order_key)
+        f"{raw_bundle_name} ({bundle_year})" if bundle_year else raw_bundle_name
     )
 
     files: list[RemoteFile] = []

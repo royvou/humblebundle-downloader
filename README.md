@@ -55,6 +55,8 @@ Sync all account orders using `HB_SESSION`:
 uv run hb sync
 ```
 
+When bundle folder names change, `hb sync` will also move existing downloaded files to the new paths when it can do so safely.
+
 Sync one or more specific order keys:
 
 ```bash

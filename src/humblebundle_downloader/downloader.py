@@ -17,7 +17,7 @@ from rich.progress import (
 
 from .humble_api import HumbleApiClient
 from .models import RemoteFile, matches_filters, parse_order_payload
-from .state import StateStore, StoredFile
+from .state import PathMigration, StateStore, StoredFile
 
 
 def md5_for_file(path: Path) -> str:
@@ -32,19 +32,80 @@ def md5_for_file(path: Path) -> str:
 
 
 async def sync_orders(
-    *, client: HumbleApiClient, store: StateStore, order_keys: list[str]
-) -> tuple[int, int, dict[str, str]]:
+    *,
+    client: HumbleApiClient,
+    store: StateStore,
+    order_keys: list[str],
+    output_dir: Path,
+) -> tuple[int, int, int, int, dict[str, str]]:
     payloads, errors = await client.fetch_orders(order_keys, concurrency=2)
     inserted = 0
     updated = 0
+    migrated = 0
+    skipped = 0
     for order_key, payload in payloads.items():
         bundle_name, remote_files = parse_order_payload(order_key, payload)
-        order_inserted, order_updated = store.upsert_order_files(
+        order_inserted, order_updated, migrations = store.upsert_order_files(
             order_key, bundle_name, remote_files
         )
         inserted += order_inserted
         updated += order_updated
-    return inserted, updated, errors
+        order_migrated, order_skipped = apply_path_migrations(
+            store=store,
+            output_dir=output_dir,
+            migrations=migrations,
+        )
+        migrated += order_migrated
+        skipped += order_skipped
+    return inserted, updated, migrated, skipped, errors
+
+
+def apply_path_migrations(
+    *,
+    store: StateStore,
+    output_dir: Path,
+    migrations: list[PathMigration],
+) -> tuple[int, int]:
+    moved = 0
+    skipped = 0
+    for migration in migrations:
+        source = output_dir / migration.old_relative_path
+        destination = output_dir / migration.new_relative_path
+
+        if not source.exists():
+            continue
+        if destination.exists():
+            skipped += 1
+            continue
+
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        source.replace(destination)
+        _remove_empty_parents(source.parent, output_dir)
+        moved += 1
+
+        if migration.restore_complete:
+            store.mark_complete(migration.file_id)
+
+    return moved, skipped
+
+
+def _remove_empty_parents(path: Path, stop_at: Path) -> None:
+    current = path
+    stop_at = stop_at.resolve()
+    while True:
+        try:
+            current_resolved = current.resolve()
+        except OSError:
+            break
+
+        if current_resolved == stop_at:
+            break
+
+        try:
+            current.rmdir()
+        except OSError:
+            break
+        current = current.parent
 
 
 async def _refresh_remote_files(
