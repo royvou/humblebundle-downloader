@@ -1,89 +1,55 @@
 # Humble Bundle Downloader
 
-HTTP-only CLI for syncing and downloading DRM-free files from Humble Bundle order keys.
+Humble Bundle Downloader is a small Python CLI for syncing Humble order metadata and downloading DRM-free files with your Humble account session cookie.
 
-## Setup
+## Highlights
 
-1. Create a `.env` file:
+- sync account orders into a local SQLite database
+- download pending files with configurable concurrency
+- verify existing files and requeue missing or invalid downloads
+- retry failures without resyncing everything
+- filter downloads by format and platform
+- use automatic account discovery or a curated `keys.txt` file
 
-```env
-HB_SESSION="your_simpleauth_sess_value"
-HB_OUTPUT_DIR=~/downloads/humblebundle
-HB_DB_PATH=.data/hb.sqlite3
-HB_CONCURRENCY=6
-HB_FORMATS=pdf,epub
-HB_PLATFORMS=ebook,audio,windows
-```
+## Requirements
 
-2. Sync dependencies:
+- Python 3.12+
+- [`uv`](https://docs.astral.sh/uv/)
+
+## Quick start
 
 ```bash
 uv sync
-```
-
-3. Generate starter files:
-
-```bash
 uv run hb init
-```
-
-4. Validate the session:
-
-```bash
 uv run hb auth test
-```
-
-5. Sync your Humble account orders automatically:
-
-```bash
 uv run hb sync
-```
-
-Or sync specific orders manually:
-
-```bash
-uv run hb sync keys.txt
-uv run hb sync --keys-file keys.txt
-uv run hb sync --key ABC123 --key DEF456
-```
-
-## Usage
-
-Sync all account orders using `HB_SESSION`:
-
-```bash
-uv run hb sync
-```
-
-When bundle folder names change, `hb sync` will also move existing downloaded files to the new paths when it can do so safely.
-
-Sync one or more specific order keys:
-
-```bash
-uv run hb sync --key ABC123 --key DEF456
-uv run hb sync keys.txt
-uv run hb sync --keys-file keys.txt
-```
-
-Download pending files:
-
-```bash
 uv run hb download
 ```
 
-Verify completed files:
+Before running `auth test`, open `.env` and set `HB_SESSION` to your Humble `_simpleauth_sess` cookie value.
+
+## Common commands
 
 ```bash
+uv run hb sync
+uv run hb sync --keys-file keys.txt
+uv run hb download --concurrency 10
 uv run hb verify
-```
-
-Inspect stored state:
-
-```bash
-uv run hb status
 uv run hb retry-failed
+uv run hb status
 ```
 
-`keys.txt` can contain bare order keys or `https://www.humblebundle.com/downloads?key=...` URLs.
+## Documentation
 
-`uv run hb init --force` will overwrite an existing `.env` or `keys.txt`.
+Detailed docs live in [`docs/`](docs/README.md):
+
+- [Getting started](docs/getting-started.md)
+- [Configuration](docs/configuration.md)
+- [Command reference](docs/commands.md)
+- [Working with `keys.txt`](docs/keys.md)
+- [Troubleshooting](docs/troubleshooting.md)
+- [Development](docs/development.md)
+
+## Contributing
+
+Issues and pull requests are welcome.
